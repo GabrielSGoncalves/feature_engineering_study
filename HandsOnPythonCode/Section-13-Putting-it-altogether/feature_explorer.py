@@ -1,15 +1,21 @@
 import pandas as pd
 import numpy as np
 from scipy import stats
-import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from feature_engine import variable_transformers as vt
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
+import plotly.graph_objects as go
+import plotly.express as px
+
+# Define Color pallete
+colors = px.colors.qualitative.G10
 
 
-def _get_feature_info(dataframe, column):
+def _get_numerical_feature_info_original(dataframe, column):
     dict_info = {
         'col1': {
             #'Cardinality': len(dataframe[column].unique()),
-            'Missing Values': dataframe[column].isnull().sum().round(2),
+            'Missing Values': dataframe[column].isnull().mean().round(2),
             'Mean': dataframe[column].mean().round(2),
             'Median': dataframe[column].median().round(2),
         },
@@ -23,40 +29,31 @@ def _get_feature_info(dataframe, column):
     # return {**{'Feature': column}, **dict_info}
 
 
+def _get_numerical_feature_info(dataframe, column):
+    dict_info = {
+        'Missing Values': dataframe[column].isnull().mean().round(2),
+        'Mean': dataframe[column].mean().round(2),
+        'Median': dataframe[column].median().round(2),
+        'Std': dataframe[column].std().round(2),
+        'Skew': dataframe[column].skew().round(2),
+        'Kurtosis': dataframe[column].kurtosis().round(2),
+    }
+    return dict_info
+
+
 def _get_table_trace(dict_feature_info, distribution):
     trace = go.Table(
-        header=dict(values=[distribution], font=dict(color='blue', size=12),),
+        header=dict(values=[distribution], font=dict(color='navy', size=16),),
         cells=dict(
             values=[
-                list(dict_feature_info.get('col1').keys()),
-                list(dict_feature_info.get('col1').values()),
-                list(dict_feature_info.get('col2').keys()),
-                list(dict_feature_info.get('col2').values()),
+                list(dict_feature_info.keys()),
+                list(dict_feature_info.values()),
             ],
-            font=dict(color='black', size=8),
+            font=dict(color='black', size=12),
         ),
     )
 
     return trace
-
-
-def _plot_table(dict_feature_info):
-    fig = go.Figure(
-        data=[
-            go.Table(
-                header=dict(
-                    values=['feature', dict_feature_info.get('feature')]
-                ),
-                cells=dict(
-                    values=[
-                        list(dict_feature_info.keys())[1:],
-                        list(dict_feature_info.values())[1:],
-                    ]
-                ),
-            )
-        ]
-    )
-    return fig
 
 
 def _get_qqplot_trace(dataframe, column, **kwargs):
@@ -66,7 +63,9 @@ def _get_qqplot_trace(dataframe, column, **kwargs):
     trace_markers = go.Scatter(
         x=qq[0][0], y=qq[0][1], mode='markers', **kwargs
     )
-    trace_line = go.Scatter(x=x, y=qq[1][1] + qq[1][0] * x, mode='lines')
+    trace_line = go.Scatter(
+        x=x, y=qq[1][1] + qq[1][0] * x, mode='lines', **kwargs
+    )
     return trace_markers, trace_line
 
 
@@ -77,10 +76,7 @@ def _get_histogram_trace(dataframe, column, **kwargs):
     return go.Histogram(x=dataframe[column], **kwargs)  # nbinsx=nbins, )
 
 
-from feature_engine import variable_transformers as vt
-
-
-def _transform_feature(dataframe, feature):
+def _transform_numerical_feature(dataframe, feature):
     """
     """
     # Validate for numeric
@@ -127,277 +123,156 @@ def _transform_feature(dataframe, feature):
     return df_out
 
 
-def _create_feature_subplots_original(
-    dataframe, feature, plot_size=(1200, 800)
-):
+def _create_feature_subplots_new(dataframe, feature, plot_size=(1200, 800)):
     #
     width, height = plot_size
-    df_tranformed = _transform_feature(dataframe, feature)
+    df_tranformed = _transform_numerical_feature(dataframe, feature)
 
     # Initialize figure with subplots
     fig = make_subplots(
-        rows=2,
-        cols=8,
-        # column_widths=[0.6, 0.4],
+        rows=6,
+        cols=4,
+        column_widths=[0.4, 0.2, 0.2, 0.2],
         # row_heights=[0.4, 0.6],
-        subplot_titles=(
-            "Original",
-            "Log",
-            "Reciprocal",
-            "Power",
-            'SquareRoot',
-            "Box-Cox",
-            "Yeo-Johnson",
-            "Q-Q Plots",
-        ),
         specs=[
             [
                 {"type": "table"},
                 {"type": "table"},
                 {"type": "table"},
                 {"type": "table"},
-                {"type": "table"},
-                {"type": "table"},
-                {"type": "table"},
-                {"type": "scatter", "rowspan": 2},
             ],
             [
+                {"type": "histogram", "rowspan": 2},
                 {"type": "histogram"},
                 {"type": "histogram"},
                 {"type": "histogram"},
-                {"type": "histogram"},
-                {"type": "histogram"},
-                {"type": "histogram"},
-                {"type": "histogram"},
+            ],
+            [
                 None,
+                {"type": "scatter"},
+                {"type": "scatter"},
+                {"type": "scatter"},
             ],
-        ],
-    )
-
-    fig.add_trace(
-        _get_table_trace(
-            _get_feature_info(df_tranformed, feature), 'Original'
-        ),
-        row=1,
-        col=1,
-    )
-    fig.add_trace(
-        _get_table_trace(
-            _get_feature_info(df_tranformed, f'{feature}_log'), 'Log'
-        ),
-        row=1,
-        col=2,
-    )
-    fig.add_trace(
-        _get_table_trace(
-            _get_feature_info(df_tranformed, f'{feature}_power'), 'Power'
-        ),
-        row=1,
-        col=3,
-    )
-    fig.add_trace(
-        _get_table_trace(
-            _get_feature_info(df_tranformed, f'{feature}_sqrt'), 'SquareRoot'
-        ),
-        row=1,
-        col=4,
-    )
-    fig.add_trace(
-        _get_table_trace(
-            _get_feature_info(df_tranformed, f'{feature}_reciprocal'),
-            'Reciprocal',
-        ),
-        row=1,
-        col=5,
-    )
-    fig.add_trace(
-        _get_table_trace(
-            _get_feature_info(df_tranformed, f'{feature}_boxcox'), 'Box-Cox'
-        ),
-        row=1,
-        col=6,
-    )
-    fig.add_trace(
-        _get_table_trace(
-            _get_feature_info(df_tranformed, f'{feature}_yeojohnson'),
-            'Yeo-Johnson',
-        ),
-        row=1,
-        col=7,
-    )
-
-    fig.add_trace(
-        _get_histogram_trace(df_tranformed, feature, name='Original'),
-        row=2,
-        col=1,
-    )
-    fig.add_trace(
-        _get_histogram_trace(df_tranformed, f'{feature}_log', name='Log'),
-        row=2,
-        col=2,
-    )
-    fig.add_trace(
-        _get_histogram_trace(df_tranformed, f'{feature}_power', name='Power'),
-        row=2,
-        col=5,
-    )
-    fig.add_trace(
-        _get_histogram_trace(
-            df_tranformed, f'{feature}_sqrt', name='SquareRoot'
-        ),
-        row=2,
-        col=3,
-    )
-    fig.add_trace(
-        _get_histogram_trace(
-            df_tranformed, f'{feature}_reciprocal', name='Reciprocal'
-        ),
-        row=2,
-        col=4,
-    )
-
-    fig.add_trace(
-        _get_histogram_trace(
-            df_tranformed, f'{feature}_boxcox', name='Box-Cox'
-        ),
-        row=2,
-        col=6,
-    )
-    fig.add_trace(
-        _get_histogram_trace(
-            df_tranformed, f'{feature}_yeojohnson', name='Yeo-Johnson'
-        ),
-        row=2,
-        col=7,
-    )
-
-    fig.add_trace(
-        _get_qqplot_trace(dataframe, feature, name='Q-Q Plot')[0], row=1, col=8
-    )
-
-    fig.add_trace(_get_qqplot_trace(dataframe, feature)[1], row=1, col=8)
-
-    fig.update_layout(
-        # title_text="Correlation Matrix",
-        # title_font_family="Arial",
-        # title_font_size=28,
-        # title_x=0.5,
-        width=width,
-        height=height,
-        # xaxis_showgrid=True,
-        # yaxis_showgrid=True,
-        # yaxis_autorange="reversed",
-        legend=dict(
-            orientation="h", yanchor="top"
-        ),  # , y=1.02, xanchor="right", x=1
-    )
-
-    return fig
-
-
-def _create_feature_subplots(dataframe, feature, plot_size=(1200, 800)):
-    #
-    width, height = plot_size
-    df_tranformed = _transform_feature(dataframe, feature)
-
-    # Initialize figure with subplots
-    fig = make_subplots(
-        rows=7,
-        cols=3,
-        column_widths=[0.2, 0.2, 0.6],
-        # row_heights=[0.4, 0.6],
-        specs=[
             [
+                {"type": "scatter", "rowspan": 2},
                 {"type": "table"},
-                {"type": "histogram"},
-                {"type": "scatter", "rowspan": 7},
+                {"type": "table"},
+                {"type": "table"},
             ],
-            [{"type": "table"}, {"type": "histogram"}, None],
-            [{"type": "table"}, {"type": "histogram"}, None],
-            [{"type": "table"}, {"type": "histogram"}, None],
-            [{"type": "table"}, {"type": "histogram"}, None],
-            [{"type": "table"}, {"type": "histogram"}, None],
-            [{"type": "table"}, {"type": "histogram"}, None],
+            [
+                None,
+                {"type": "histogram"},
+                {"type": "histogram"},
+                {"type": "histogram"},
+            ],
+            [
+                None,
+                {"type": "scatter"},
+                {"type": "scatter"},
+                {"type": "scatter"},
+            ],
         ],
     )
 
     fig.add_trace(
         _get_table_trace(
-            _get_feature_info(df_tranformed, feature), 'Original'
+            _get_numerical_feature_info(df_tranformed, feature), 'Original'
         ),
         row=1,
         col=1,
     )
     fig.add_trace(
         _get_table_trace(
-            _get_feature_info(df_tranformed, f'{feature}_log'), 'Log'
+            _get_numerical_feature_info(df_tranformed, f'{feature}_log'), 'Log'
         ),
-        row=2,
-        col=1,
+        row=1,
+        col=2,
     )
     fig.add_trace(
         _get_table_trace(
-            _get_feature_info(df_tranformed, f'{feature}_power'), 'Power 2'
+            _get_numerical_feature_info(df_tranformed, f'{feature}_power'),
+            'Power 2',
         ),
-        row=3,
-        col=1,
+        row=1,
+        col=3,
     )
     fig.add_trace(
         _get_table_trace(
-            _get_feature_info(df_tranformed, f'{feature}_sqrt'), 'SquareRoot'
+            _get_numerical_feature_info(df_tranformed, f'{feature}_sqrt'),
+            'SquareRoot',
         ),
-        row=4,
-        col=1,
+        row=1,
+        col=4,
     )
     fig.add_trace(
         _get_table_trace(
-            _get_feature_info(df_tranformed, f'{feature}_reciprocal'),
+            _get_numerical_feature_info(
+                df_tranformed, f'{feature}_reciprocal'
+            ),
             'Reciprocal',
         ),
-        row=5,
-        col=1,
-    )
-    fig.add_trace(
-        _get_table_trace(
-            _get_feature_info(df_tranformed, f'{feature}_boxcox'), 'Box-Cox'
-        ),
-        row=6,
-        col=1,
-    )
-    fig.add_trace(
-        _get_table_trace(
-            _get_feature_info(df_tranformed, f'{feature}_yeojohnson'),
-            'Yeo-Johnson',
-        ),
-        row=7,
-        col=1,
-    )
-
-    fig.add_trace(
-        _get_histogram_trace(df_tranformed, feature, name='Original'),
-        row=1,
-        col=2,
-    )
-    fig.add_trace(
-        _get_histogram_trace(df_tranformed, f'{feature}_log', name='Log'),
-        row=2,
-        col=2,
-    )
-    fig.add_trace(
-        _get_histogram_trace(df_tranformed, f'{feature}_power', name='Power'),
-        row=3,
-        col=2,
-    )
-    fig.add_trace(
-        _get_histogram_trace(
-            df_tranformed, f'{feature}_sqrt', name='SquareRoot'
-        ),
         row=4,
         col=2,
     )
     fig.add_trace(
+        _get_table_trace(
+            _get_numerical_feature_info(df_tranformed, f'{feature}_boxcox'),
+            'Box-Cox',
+        ),
+        row=4,
+        col=3,
+    )
+    fig.add_trace(
+        _get_table_trace(
+            _get_numerical_feature_info(
+                df_tranformed, f'{feature}_yeojohnson'
+            ),
+            'Yeo-Johnson',
+        ),
+        row=4,
+        col=4,
+    )
+
+    fig.add_trace(
         _get_histogram_trace(
-            df_tranformed, f'{feature}_reciprocal', name='Reciprocal'
+            df_tranformed, feature, name='Original', marker_color=colors[0]
+        ),
+        row=2,
+        col=1,
+    )
+    fig.add_trace(
+        _get_histogram_trace(
+            df_tranformed, f'{feature}_log', name='Log', marker_color=colors[1]
+        ),
+        row=2,
+        col=2,
+    )
+    fig.add_trace(
+        _get_histogram_trace(
+            df_tranformed,
+            f'{feature}_power',
+            name='Power',
+            marker_color=colors[2],
+        ),
+        row=2,
+        col=3,
+    )
+    fig.add_trace(
+        _get_histogram_trace(
+            df_tranformed,
+            f'{feature}_sqrt',
+            name='SquareRoot',
+            marker_color=colors[3],
+        ),
+        row=2,
+        col=4,
+    )
+    fig.add_trace(
+        _get_histogram_trace(
+            df_tranformed,
+            f'{feature}_reciprocal',
+            name='Reciprocal',
+            marker_color=colors[4],
         ),
         row=5,
         col=2,
@@ -405,65 +280,182 @@ def _create_feature_subplots(dataframe, feature, plot_size=(1200, 800)):
 
     fig.add_trace(
         _get_histogram_trace(
-            df_tranformed, f'{feature}_boxcox', name='Box-Cox'
+            df_tranformed,
+            f'{feature}_boxcox',
+            name='Box-Cox',
+            marker_color=colors[5],
         ),
-        row=6,
-        col=2,
+        row=5,
+        col=3,
     )
     fig.add_trace(
         _get_histogram_trace(
-            df_tranformed, f'{feature}_yeojohnson', name='Yeo-Johnson'
+            df_tranformed,
+            f'{feature}_yeojohnson',
+            name='Yeo-Johnson',
+            marker_color=colors[6],
         ),
-        row=7,
+        row=5,
+        col=4,
+    )
+
+    fig.add_trace(
+        _get_qqplot_trace(
+            df_tranformed,
+            feature,
+            name='Q-Q Plot Original',
+            marker_color=colors[0],
+        )[0],
+        row=4,
+        col=1,
+    )
+    fig.add_trace(
+        _get_qqplot_trace(df_tranformed, feature, marker_color='black',)[1],
+        row=4,
+        col=1,
+    )
+    fig.add_trace(
+        _get_qqplot_trace(
+            df_tranformed,
+            f'{feature}_log',
+            name='Q-Q Plot Log',
+            marker_color=colors[1],
+        )[0],
+        row=3,
+        col=2,
+    )
+    fig.add_trace(
+        _get_qqplot_trace(
+            df_tranformed, f'{feature}_log', marker_color='black',
+        )[1],
+        row=3,
         col=2,
     )
 
     fig.add_trace(
-        _get_qqplot_trace(df_tranformed, feature, name='Q-Q Plot Original')[0],
-        row=1,
+        _get_qqplot_trace(
+            df_tranformed,
+            f'{feature}_power',
+            name='Q-Q Plot Power 2',
+            marker_color=colors[2],
+        )[0],
+        row=3,
         col=3,
     )
     fig.add_trace(
         _get_qqplot_trace(
-            df_tranformed, f'{feature}_log', name='Q-Q Plot Log'
-        )[0],
-        row=1,
+            df_tranformed, f'{feature}_power', marker_color='black',
+        )[1],
+        row=3,
         col=3,
     )
-
-    fig.add_trace(_get_qqplot_trace(df_tranformed, feature)[1], row=1, col=3)
     fig.add_trace(
-        _get_qqplot_trace(df_tranformed, f'{feature}_log')[1], row=1, col=3
+        _get_qqplot_trace(
+            df_tranformed,
+            f'{feature}_sqrt',
+            name='Q-Q Plot SquareRoot',
+            marker_color=colors[3],
+        )[0],
+        row=3,
+        col=4,
+    )
+    fig.add_trace(
+        _get_qqplot_trace(
+            df_tranformed, f'{feature}_sqrt', marker_color='black',
+        )[1],
+        row=3,
+        col=4,
+    )
+    fig.add_trace(
+        _get_qqplot_trace(
+            df_tranformed,
+            f'{feature}_reciprocal',
+            name='Q-Q Plot Reciprocal',
+            marker_color=colors[4],
+        )[0],
+        row=6,
+        col=2,
+    )
+    fig.add_trace(
+        _get_qqplot_trace(
+            df_tranformed, f'{feature}_reciprocal', marker_color='black',
+        )[1],
+        row=6,
+        col=2,
+    )
+    fig.add_trace(
+        _get_qqplot_trace(
+            df_tranformed,
+            f'{feature}_boxcox',
+            name='Q-Q Plot Box-Cox',
+            marker_color=colors[5],
+        )[0],
+        row=6,
+        col=3,
+    )
+    fig.add_trace(
+        _get_qqplot_trace(
+            df_tranformed, f'{feature}_boxcox', marker_color='black',
+        )[1],
+        row=6,
+        col=3,
+    )
+    fig.add_trace(
+        _get_qqplot_trace(
+            df_tranformed,
+            f'{feature}_yeojohnson',
+            name='Q-Q Plot Yeo-Johnson',
+            marker_color=colors[6],
+        )[0],
+        row=6,
+        col=4,
+    )
+    fig.add_trace(
+        _get_qqplot_trace(
+            df_tranformed, f'{feature}_yeojohnson', marker_color='black',
+        )[1],
+        row=6,
+        col=4,
     )
 
     fig.update_layout(
-        # title_text="Correlation Matrix",
-        # title_font_family="Arial",
-        # title_font_size=28,
+        title_text=f"Normality Analysis for feature: {feature}",
+        title_font_family="Arial",
+        title_font_size=28,
         # title_x=0.5,
         width=width,
         height=height,
+        showlegend=False
         # xaxis_showgrid=True,
         # yaxis_showgrid=True,
         # yaxis_autorange="reversed",
-        legend=dict(
-            orientation="h", yanchor="top"
-        ),  # , y=1.02, xanchor="right", x=1
+        # legend=False
+        # legend=dict(
+        #    orientation="h", yanchor="top"
+        # ),  # , y=1.02, xanchor="right", x=1
     )
 
     return fig
 
 
 class FeatureExplorer:
-    def __init__(self, dataframe, dict_dtypes):
+    def __init__(self, dataframe, target, target_type, dict_dtypes):
 
         self.dataframe = dataframe
         self.dict_dtypes = dict_dtypes
         self.dict_transformed_feats = {}
 
-    def plot_feature_info(self, feature, plot_size):
-        df_tranformed = _transform_feature(self.dataframe, feature)
+    def plot_numerical_feature_info(
+        self, feature, scaler=None, plot_size=(1200, 800)
+    ):
+        df_transformed = _transform_numerical_feature(self.dataframe, feature)
+
+        if scaler:
+            df_transformed = pd.DataFrame(
+                scaler.fit_transform(df_transformed),
+                columns=df_transformed.columns,
+            )
 
         # Initialize figure with subplots
-        fig = _create_feature_subplots(self.dataframe, feature, plot_size)
+        fig = _create_feature_subplots_new(df_transformed, feature, plot_size)
         fig.show()
