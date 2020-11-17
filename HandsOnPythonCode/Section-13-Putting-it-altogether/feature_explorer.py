@@ -438,17 +438,32 @@ def _create_feature_subplots_new(dataframe, feature, plot_size=(1200, 800)):
     return fig
 
 
-class FeatureExplorer:
-    def __init__(self, dataframe, target, target_type, dict_dtypes):
+import re
 
-        self.dataframe = dataframe
+
+def _get_transformation(col_name):
+    transf_type = col_name.split('_')
+    try:
+        return transf_type[1]
+    except:
+        return 'original'
+
+
+class FeatureExplorer:
+    def __init__(self, X, target, target_type, dict_dtypes):
+
+        self.X = X
         self.dict_dtypes = dict_dtypes
         self.dict_transformed_feats = {}
+        self.X_train = None
+        self.X_test = None
+        self.X_train_tranformed = None
+        self.X_test_tranformed = None
 
     def plot_numerical_feature_info(
         self, feature, scaler=None, plot_size=(1200, 800)
     ):
-        df_transformed = _transform_numerical_feature(self.dataframe, feature)
+        df_transformed = _transform_numerical_feature(self.X, feature)
 
         if scaler:
             df_transformed = pd.DataFrame(
@@ -459,3 +474,6 @@ class FeatureExplorer:
         # Initialize figure with subplots
         fig = _create_feature_subplots_new(df_transformed, feature, plot_size)
         fig.show()
+
+    def select_transformed_features(self):
+        pass
