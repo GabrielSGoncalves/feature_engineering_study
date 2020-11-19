@@ -1,3 +1,4 @@
+from typing import List, Dict, Tuple, Optional
 import pandas as pd
 import numpy as np
 from scipy import stats
@@ -11,25 +12,8 @@ import plotly.express as px
 colors = px.colors.qualitative.G10
 
 
-def _get_numerical_feature_info_original(dataframe, column):
-    dict_info = {
-        'col1': {
-            #'Cardinality': len(dataframe[column].unique()),
-            'Missing Values': dataframe[column].isnull().mean().round(2),
-            'Mean': dataframe[column].mean().round(2),
-            'Median': dataframe[column].median().round(2),
-        },
-        'col2': {
-            'Std': dataframe[column].std().round(2),
-            'Skew': dataframe[column].skew().round(2),
-            'Kurtosis': dataframe[column].kurtosis().round(2),
-        },
-    }
-    return dict_info
-    # return {**{'Feature': column}, **dict_info}
-
-
-def _get_numerical_feature_info(dataframe, column):
+def _get_numerical_feature_info(dataframe: pd.DataFrame, column: str) -> Dict:
+    """Generate statistical metrics for a feature in dataframe."""
     dict_info = {
         'Missing Values': dataframe[column].isnull().mean().round(2),
         'Mean': dataframe[column].mean().round(2),
@@ -41,7 +25,8 @@ def _get_numerical_feature_info(dataframe, column):
     return dict_info
 
 
-def _get_table_trace(dict_feature_info, distribution):
+def _get_table_trace(dict_feature_info: Dict, distribution: str) -> go.Table:
+    """Generate table plotly trace from a feature dictionary."""
     trace = go.Table(
         header=dict(values=[distribution], font=dict(color='navy', size=16),),
         cells=dict(
@@ -56,8 +41,11 @@ def _get_table_trace(dict_feature_info, distribution):
     return trace
 
 
-def _get_qqplot_trace(dataframe, column, **kwargs):
-    qq = stats.probplot(dataframe[column], dist='lognorm', sparams=(1))
+def _get_qqplot_trace(
+    df: pd.DataFrame, column: str, **kwargs
+) -> Tuple[go.Scatter, go.Scatter]:
+    """Generate QQ-Plots traces."""
+    qq = stats.probplot(df[column], dist='lognorm', sparams=(1))
     x = np.array([qq[0][0][0], qq[0][0][-1]])
 
     trace_markers = go.Scatter(
@@ -69,18 +57,19 @@ def _get_qqplot_trace(dataframe, column, **kwargs):
     return trace_markers, trace_line
 
 
-# def _get_histogram_trace(dataframe, column, nbins=40, **kwargs):
-def _get_histogram_trace(dataframe, column, **kwargs):
-    """
-    """
-    return go.Histogram(x=dataframe[column], **kwargs)  # nbinsx=nbins, )
+def _get_histogram_trace(
+    df: pd.DataFrame, column: str, **kwargs
+) -> go.Histogram:
+    """Generate histogram traces for feature on dataframe."""
+    return go.Histogram(x=df[column], **kwargs)  # nbinsx=nbins, )
 
 
-def _transform_numerical_feature(dataframe, feature):
-    """
-    """
+def _transform_numerical_feature(
+    df: pd.DataFrame, feature: str
+) -> pd.DataFrame:
+    """Perform numerical transformations on a feature from dataframe."""
     # Validate for numeric
-    df_filtered = dataframe[dataframe[feature].notnull()][[feature]]
+    df_filtered = df[df[feature].notnull()][[feature]]
     df_out = df_filtered.copy()
 
     # Perform transformations
@@ -422,26 +411,15 @@ def _create_feature_subplots_new(dataframe, feature, plot_size=(1200, 800)):
         title_text=f"Normality Analysis for feature: {feature}",
         title_font_family="Arial",
         title_font_size=28,
-        # title_x=0.5,
         width=width,
         height=height,
-        showlegend=False
-        # xaxis_showgrid=True,
-        # yaxis_showgrid=True,
-        # yaxis_autorange="reversed",
-        # legend=False
-        # legend=dict(
-        #    orientation="h", yanchor="top"
-        # ),  # , y=1.02, xanchor="right", x=1
+        showlegend=False,
     )
 
     return fig
 
 
-import re
-
-
-def _get_transformation(col_name):
+def _get_transformation(col_name: str) -> str:
     transf_type = col_name.split('_')
     try:
         return transf_type[1]
@@ -449,7 +427,7 @@ def _get_transformation(col_name):
         return 'original'
 
 
-class FeatureExplorer:
+class DatasetTransformer:
     def __init__(self, X, target, target_type, dict_dtypes):
 
         self.X = X
@@ -459,10 +437,21 @@ class FeatureExplorer:
         self.X_test = None
         self.X_train_tranformed = None
         self.X_test_tranformed = None
+        self.transformation_pipeline = None
 
     def plot_numerical_feature_info(
-        self, feature, scaler=None, plot_size=(1200, 800)
+        self,
+        feature: str,
+        scaler: Optional[str] = None,
+        plot_size: Tuple = (1200, 800),
     ):
+        """Plot general info and transformations for an specific feature.
+
+        Parameters
+        ----------
+
+        featu
+        """
         df_transformed = _transform_numerical_feature(self.X, feature)
 
         if scaler:
@@ -475,5 +464,8 @@ class FeatureExplorer:
         fig = _create_feature_subplots_new(df_transformed, feature, plot_size)
         fig.show()
 
-    def select_transformed_features(self):
+    def plot_categorical_features(self):
+        pass
+
+    def transformed_and_select_features(self):
         pass
