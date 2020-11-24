@@ -440,17 +440,14 @@ class DatasetTransformer:
         self.transformation_pipeline = None
 
     def plot_numerical_feature_info(
-        self,
-        feature: str,
-        scaler: Optional[str] = None,
-        plot_size: Tuple = (1200, 800),
+        self, feature: str, scaler=None, plot_size: Tuple = (1200, 800),
     ):
         """Plot general info and transformations for an specific feature.
 
         Parameters
         ----------
 
-        featu
+        feature : str
         """
         df_transformed = _transform_numerical_feature(self.X, feature)
 
